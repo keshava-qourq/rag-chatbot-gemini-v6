@@ -10,14 +10,21 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
-from app import models  # noqa: F401 -- imported so the tables register before create_all
-from app.database import Base, engine
+from app.routers import auth_router, documents_router, sessions_router
+from app.security import JWT_SECRET_KEY
 from app.services import configured_services
+
+_DESCRIPTION = (
+    "Build a rag chatbot where user can upload there own documents and ask "
+    "queries about them use gemini-2.5-flash for answers and "
+    "gemini-embedding-001 for embeddings and have chat history and sessions"
+)
 
 app = FastAPI(
     title="Rag_chatbot_gemini_v6",
-    description="Build a rag chatbot where user can upload there own documents and ask queries about them use gemini-2.5-flash for answers and gemini-embedding-001 for embeddings and have chat history and sessions",
+    description=_DESCRIPTION,
     version="0.1.0",
 )
 
@@ -35,9 +42,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# The scaffold ships no migrations, so the tables are created from the models on
-# startup. Replace this with Alembic before anything holds data worth keeping.
-Base.metadata.create_all(bind=engine)
+# Session-based auth (architecture: "Session-based auth, per-user authorization and
+# isolation"): signs the session cookie with JWT_SECRET_KEY, never with SECRET_KEY --
+# that one is public, see app/security.py. The development sprint reads/writes
+# `request.session` in the auth router to establish and end a session.
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=JWT_SECRET_KEY,
+    same_site="lax",
+    https_only=False,  # the platform terminates TLS in front of this container
+)
+
+app.include_router(auth_router)
+app.include_router(documents_router)
+app.include_router(sessions_router)
+
+# The schema lives in Alembic migrations (see backend/alembic/), applied with
+# `alembic upgrade head` before this container starts (see backend/Dockerfile)
+# -- not created from the models here, so "change the schema only through
+# migrations" stays true from the very first deploy.
 
 
 @app.get("/health")
