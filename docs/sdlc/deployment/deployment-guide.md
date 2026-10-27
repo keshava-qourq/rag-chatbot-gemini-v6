@@ -7,7 +7,15 @@ Pushes to `main` run `.github/workflows/deploy.yml`, which builds the API image 
 <!-- sdlc:auto:end how-it-deploys -->
 
 <!-- sdlc:auto:start environments -->
-_No environments recorded._
+| Name | Service | Runtime | Scaling | Environment |
+|---|---|---|---|---|
+| Web (React 19) | Static SPA served via CDN/container | Node build, static assets | Single dev instance | dev |
+| API (FastAPI 0.115) | Uvicorn app container | Python 3.12 | Single dev container | dev |
+| Ingestion Worker | arq worker container | Python 3.12 | Single dev worker, concurrency configurable | dev |
+| PostgreSQL 16 + pgvector | Amazon RDS for PostgreSQL (dev: container) | PostgreSQL 16 with vector extension | Single instance | dev |
+| Redis | redis:7-alpine container | Redis 7 | Single instance | dev |
+| Amazon S3 | S3 bucket | Managed object storage | Managed | dev |
+| Google Gemini API | External SaaS | Gemini API | Managed | dev |
 <!-- sdlc:auto:end environments -->
 
 <!-- sdlc:auto:start live -->
@@ -15,5 +23,23 @@ _Not deployed yet._
 <!-- sdlc:auto:end live -->
 
 <!-- sdlc:auto:start topology -->
-_No deployment topology recorded._
+```mermaid
+graph LR
+  n_Web__React_19_["Web (React 19)<br/>Static SPA served via CDN/container"]
+  n_API__FastAPI_0_115_["API (FastAPI 0.115)<br/>Uvicorn app container"]
+  n_Ingestion_Worker["Ingestion Worker<br/>arq worker container"]
+  n_PostgreSQL_16___pgvector["PostgreSQL 16 + pgvector<br/>Amazon RDS for PostgreSQL (dev: container)"]
+  n_Redis["Redis<br/>redis:7-alpine container"]
+  n_Amazon_S3["Amazon S3<br/>S3 bucket"]
+  n_Google_Gemini_API["Google Gemini API<br/>External SaaS"]
+  n_Web__React_19_ -->|"HTTPS"| n_API__FastAPI_0_115_
+  n_API__FastAPI_0_115_ -->|"TCP/TLS"| n_PostgreSQL_16___pgvector
+  n_API__FastAPI_0_115_ -->|"TCP"| n_Redis
+  n_API__FastAPI_0_115_ -->|"HTTPS"| n_Amazon_S3
+  n_API__FastAPI_0_115_ -->|"HTTPS"| n_Google_Gemini_API
+  n_Ingestion_Worker -->|"TCP"| n_Redis
+  n_Ingestion_Worker -->|"TCP/TLS"| n_PostgreSQL_16___pgvector
+  n_Ingestion_Worker -->|"HTTPS"| n_Amazon_S3
+  n_Ingestion_Worker -->|"HTTPS"| n_Google_Gemini_API
+```
 <!-- sdlc:auto:end topology -->

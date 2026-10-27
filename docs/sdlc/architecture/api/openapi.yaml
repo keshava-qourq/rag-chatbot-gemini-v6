@@ -2,6 +2,429 @@
 openapi: 3.1.0
 info:
   title: Rag_chatbot_gemini_v6
-  version: architecture-v0
+  version: architecture-v2
   description: Designed API from the approved architecture (not extracted from code).
-paths: {}
+paths:
+  /account:
+    delete:
+      summary: Permanently delete account and all documents, embeddings, sessions
+        and messages; signs the user out.
+      description: Permanently delete account and all documents, embeddings, sessions
+        and messages; signs the user out.
+      operationId: delete_account
+      parameters: []
+      responses:
+        '200':
+          description: '{ok}'
+      security:
+      - bearerAuth: []
+  /auth/signin:
+    post:
+      summary: Authenticate email+password and establish a session; generic failure
+        on mismatch.
+      description: Authenticate email+password and establish a session; generic failure
+        on mismatch.
+      operationId: post_auth_signin
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{email, password}'
+      responses:
+        '200':
+          description: '{user_id, email}'
+  /auth/signout:
+    post:
+      summary: End the current session.
+      description: End the current session.
+      operationId: post_auth_signout
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: none
+      responses:
+        '200':
+          description: '{ok}'
+      security:
+      - bearerAuth: []
+  /auth/signup:
+    post:
+      summary: Create account with unique email and strong password, then establish
+        a session.
+      description: Create account with unique email and strong password, then establish
+        a session.
+      operationId: post_auth_signup
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{email, password}'
+      responses:
+        '200':
+          description: '{user_id, email}'
+  /documents:
+    get:
+      summary: List the signed-in user's documents with name and processing status.
+      description: List the signed-in user's documents with name and processing status.
+      operationId: get_documents
+      parameters: []
+      responses:
+        '200':
+          description: '[{id, name, status, failure_reason}]'
+      security:
+      - bearerAuth: []
+    post:
+      summary: Upload a supported document within size and usage limits; stores in
+        S3 and queues ingestion.
+      description: Upload a supported document within size and usage limits; stores
+        in S3 and queues ingestion.
+      operationId: post_documents
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: multipart file
+      responses:
+        '200':
+          description: '{document_id, status}'
+      security:
+      - bearerAuth: []
+  /documents/{id}:
+    get:
+      summary: Get one of the user's documents including status; denied if not owner.
+      description: Get one of the user's documents including status; denied if not
+        owner.
+      operationId: get_documents_id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: '{id, name, status, failure_reason}'
+      security:
+      - bearerAuth: []
+    patch:
+      summary: Rename a document to a non-empty name.
+      description: Rename a document to a non-empty name.
+      operationId: patch_documents_id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{name}'
+      responses:
+        '200':
+          description: '{id, name}'
+      security:
+      - bearerAuth: []
+    delete:
+      summary: Delete a document, its chunks, embeddings and S3 object.
+      description: Delete a document, its chunks, embeddings and S3 object.
+      operationId: delete_documents_id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: '{ok}'
+      security:
+      - bearerAuth: []
+  /sessions:
+    get:
+      summary: List the user's chat sessions.
+      description: List the user's chat sessions.
+      operationId: get_sessions
+      parameters: []
+      responses:
+        '200':
+          description: '[{id, name, created_at}]'
+      security:
+      - bearerAuth: []
+    post:
+      summary: Create a chat session scoped to one or more of the user's ready documents.
+      description: Create a chat session scoped to one or more of the user's ready
+        documents.
+      operationId: post_sessions
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{name, document_ids}'
+      responses:
+        '200':
+          description: '{id, name, document_ids}'
+      security:
+      - bearerAuth: []
+  /sessions/{id}:
+    patch:
+      summary: Rename a chat session to a non-empty name.
+      description: Rename a chat session to a non-empty name.
+      operationId: patch_sessions_id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{name}'
+      responses:
+        '200':
+          description: '{id, name}'
+      security:
+      - bearerAuth: []
+    delete:
+      summary: Delete a session and its messages; selected documents remain.
+      description: Delete a session and its messages; selected documents remain.
+      operationId: delete_sessions_id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: '{ok}'
+      security:
+      - bearerAuth: []
+  /sessions/{id}/messages:
+    get:
+      summary: Get the ordered message history of a session owned by the user.
+      description: Get the ordered message history of a session owned by the user.
+      operationId: get_sessions_id_messages
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: '[{id, role, content, citations, created_at}]'
+      security:
+      - bearerAuth: []
+    post:
+      summary: Ask a question; retrieves chunks from the session's selected documents
+        and streams a grounded gemini-2.5-flash answer wi
+      description: Ask a question; retrieves chunks from the session's selected documents
+        and streams a grounded gemini-2.5-flash answer with citations, enforcing the
+        message limit.
+      operationId: post_sessions_id_messages
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{content}'
+      responses:
+        '200':
+          description: text/event-stream of answer tokens then {message_id, citations}
+      security:
+      - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    users:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        password_hash:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - email
+      - password_hash
+      - created_at
+    documents:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        s3_key:
+          type: string
+        file_type:
+          type: string
+        size_bytes:
+          type: string
+        status:
+          type: string
+        failure_reason:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - user_id
+      - name
+      - s3_key
+      - file_type
+      - size_bytes
+      - status
+      - created_at
+    chunks:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        document_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        chunk_index:
+          type: integer
+        content:
+          type: string
+        embedding:
+          type: string
+      required:
+      - id
+      - document_id
+      - user_id
+      - chunk_index
+      - content
+      - embedding
+    chat_sessions:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - user_id
+      - name
+      - created_at
+    session_documents:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        document_id:
+          type: string
+          format: uuid
+      required:
+      - session_id
+      - document_id
+    messages:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+        role:
+          type: string
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - session_id
+      - role
+      - content
+      - created_at
+    message_citations:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+          format: uuid
+        document_id:
+          type: string
+          format: uuid
+      required:
+      - id
+      - message_id
+      - document_id
+    usage_counters:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        document_count:
+          type: integer
+        total_document_bytes:
+          type: string
+        period_message_count:
+          type: integer
+        period_started_at:
+          type: string
+          format: date-time
+      required:
+      - user_id
+      - document_count
+      - total_document_bytes
+      - period_message_count
+      - period_started_at
