@@ -5,7 +5,7 @@
 <!-- sdlc:auto:start overview -->
 Build a rag chatbot where user can upload there own documents and ask queries about them use gemini-2.5-flash for answers and gemini-embedding-001 for embeddings and have chat history and sessions
 
-**Documentation version:** v3
+**Documentation version:** v4
 <!-- sdlc:auto:end overview -->
 
 ## Contents
@@ -17,7 +17,7 @@ Build a rag chatbot where user can upload there own documents and ask queries ab
 | [Architecture](architecture/README.md) | 22 entries |
 | [Development](development/README.md) | 14 entries |
 | [Testing](testing/README.md) | 0 entries |
-| [Deployment](deployment/README.md) | 0 entries |
+| [Deployment](deployment/README.md) | 1 entry |
 | [Maintenance](maintenance/README.md) | 0 entries |
 | [Data model](architecture/data-model.md) | generated |
 | [API (OpenAPI)](architecture/api/openapi.yaml) | generated |
@@ -27,11 +27,11 @@ Build a rag chatbot where user can upload there own documents and ask queries ab
 | [API reference](development/api-reference.md) | 1 route |
 | [Test report](testing/test-report.md) | not run yet |
 | [Tests](testing/test-cases.md) | 0 tests |
-| [Deployment guide](deployment/deployment-guide.md) | not deployed yet |
-| [Runbook](deployment/runbook.md) | not deployed yet |
-| [Release notes](deployment/release-notes.md) | 0 releases |
+| [Deployment guide](deployment/deployment-guide.md) | deployed |
+| [Runbook](deployment/runbook.md) | deployed |
+| [Release notes](deployment/release-notes.md) | 1 release |
 | [Traceability matrix](traceability-matrix.md) | 20 requirements |
-| [Changelog](CHANGELOG.md) | 3 versions |
+| [Changelog](CHANGELOG.md) | 4 versions |
 <!-- sdlc:auto:end contents -->
 
 ## Open gaps
@@ -77,4 +77,13 @@ Build a rag chatbot where user can upload there own documents and ask queries ab
 - No implementation status, code, or test evidence provided.
 - Specific limit thresholds (e.g. requests/day, storage caps) are not defined in this input.
 - No detail on specific dashboard layout, widgets, or responsive breakpoints.
+
+### Deployment
+
+- No deployment date/timestamp provided.
+- No record of who approved or executed this deployment.
+- No mapping of this deployment to specific requirement IDs (US-001..US-020) or tickets delivered in this version -- cannot confirm which user stories are live.
+- No environment designation (production vs. staging vs. preview) given for either URL.
+- No rollback plan, infrastructure/hosting details (e.g. container, region, scaling), or monitoring/alerting setup documented.
+- No confirmation that automated tests passed prior to this deployment, since no testing phase input was supplied alongside this deployment record.
 <!-- sdlc:auto:end open-gaps -->
