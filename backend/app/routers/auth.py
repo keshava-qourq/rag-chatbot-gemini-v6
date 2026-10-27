@@ -72,11 +72,15 @@ async def signin(
     return UserResponse(user_id=str(user.id), email=str(user.email))
 
 
-@router.post(
-    "/auth/signout", response_model=OkResponse, dependencies=[Depends(require_api_secret)]
-)
+@router.post("/auth/signout", response_model=OkResponse)
 async def signout(request: Request) -> OkResponse:
-    """End the current session."""
+    """End the current session.
+
+    Not gated by `require_api_secret`/`current_user`: signing out of a
+    session that is already missing, stale or invalid must still succeed
+    (and the old cookie must not work afterwards, AC-006) rather than 401
+    before it ever gets the chance to clear anything.
+    """
     request.session.clear()
     return OkResponse()
 
