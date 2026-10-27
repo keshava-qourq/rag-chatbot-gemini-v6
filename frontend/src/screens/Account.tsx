@@ -1,84 +1,92 @@
 // @ts-nocheck -- generated from the approved design under its JS runtime contract; not hand-written TypeScript.
-/* eslint-disable @typescript-eslint/no-unused-vars */
+ 
 import React from "react";
 
 import * as UI from "@/lib/ui";
 import { Icons } from "@/lib/icons";
 import { brand } from "@/lib/brand";
 import { useNavigate } from "@/lib/navigate";
+import { apiFetch } from "@/lib/api";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 const { Button, Input, Label, Badge, Avatar } = UI;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 const { Check, Clock, Trash, ArrowRight, AlertCircle, CheckCircle } = Icons;
 
 const ACCOUNT = {
-  email: 'alex@example.com',
-  display_name: 'Alex Rivera',
-  created_at: '12 March 2026',
-  session_started: 'Today at 09:14 · Chrome on macOS',
-  last_sync: '4 minutes ago',
+  email: "alex@example.com",
+  display_name: "Alex Rivera",
+  created_at: "12 March 2026",
+  session_started: "Today at 09:14 · Chrome on macOS",
+  last_sync: "4 minutes ago",
 };
 
 const FOOTPRINT = [
-  { label: 'Documents', value: '7', hint: '41.8 MB stored' },
-  { label: 'Embedded chunks', value: '1,284', hint: 'in the vector store' },
-  { label: 'Chat sessions', value: '5', hint: 'last opened yesterday' },
-  { label: 'Messages', value: '162', hint: 'since 12 March 2026' },
+  { label: "Documents", value: "7", hint: "41.8 MB stored" },
+  { label: "Embedded chunks", value: "1,284", hint: "in the vector store" },
+  { label: "Chat sessions", value: "5", hint: "last opened yesterday" },
+  { label: "Messages", value: "162", hint: "since 12 March 2026" },
 ];
 
 const DELETE_STEPS = [
-  'Revoking your session on every device',
-  'Removing 1,284 embeddings from the vector store',
-  'Deleting 7 documents and their extracted text',
-  'Deleting 5 chat sessions and 162 messages',
+  "Revoking your session on every device",
+  "Removing 1,284 embeddings from the vector store",
+  "Deleting 7 documents and their extracted text",
+  "Deleting 5 chat sessions and 162 messages",
 ];
 
 const TOKENS = {
-  glass: 'rgba(255,255,255,0.06)',
-  glassStrong: 'rgba(255,255,255,0.09)',
-  hairline: 'rgba(255,255,255,0.13)',
-  hairlineSoft: 'rgba(255,255,255,0.08)',
-  textPrimary: 'rgba(255,255,255,0.94)',
-  danger: '#ff4d6d',
-  dangerWash: 'rgba(255,77,109,0.09)',
-  dangerLine: 'rgba(255,77,109,0.34)',
+  glass: "rgba(255,255,255,0.06)",
+  glassStrong: "rgba(255,255,255,0.09)",
+  hairline: "rgba(255,255,255,0.13)",
+  hairlineSoft: "rgba(255,255,255,0.08)",
+  textPrimary: "rgba(255,255,255,0.94)",
+  danger: "#ff4d6d",
+  dangerWash: "rgba(255,77,109,0.09)",
+  dangerLine: "rgba(255,77,109,0.34)",
 };
 
 export default function Screen() {
   const navigate = useNavigate();
-  const [signOutState, setSignOutState] = React.useState('idle');
+  const [signOutState, setSignOutState] = React.useState("idle");
   const [modalOpen, setModalOpen] = React.useState(false);
-  const [confirmText, setConfirmText] = React.useState('');
-  const [confirmError, setConfirmError] = React.useState('');
-  const [deleteState, setDeleteState] = React.useState('confirm');
+  const [confirmText, setConfirmText] = React.useState("");
+  const [confirmError, setConfirmError] = React.useState("");
+  const [deleteState, setDeleteState] = React.useState("confirm");
   const [step, setStep] = React.useState(0);
 
   const dialogRef = React.useRef(null);
   const inputRef = React.useRef(null);
   const triggerRef = React.useRef(null);
 
-  // Sign out -> session ends, back to the sign-in screen
-  React.useEffect(() => {
-    if (signOutState !== 'pending') return undefined;
-    const t = setTimeout(() => navigate('auth'), 900);
-    return () => clearTimeout(t);
-  }, [signOutState]);
+  // Sign out -> POST /auth/signout, drop any client auth state, back to the sign-in screen.
+  const handleSignOut = async () => {
+    if (signOutState === "pending") return;
+    setSignOutState("pending");
+    try {
+      await apiFetch("/auth/signout", { method: "POST" });
+    } catch {
+      // Even if the call itself failed (already signed out, network hiccup), the client
+      // still forgets its session and sends the user back to sign in.
+    } finally {
+      navigate("auth");
+    }
+  };
 
   // Deletion progress
   React.useEffect(() => {
-    if (deleteState !== 'deleting') return undefined;
+    if (deleteState !== "deleting") return undefined;
     const id = setInterval(() => setStep((s) => Math.min(s + 1, DELETE_STEPS.length)), 620);
     return () => clearInterval(id);
   }, [deleteState]);
 
   React.useEffect(() => {
-    if (deleteState === 'deleting' && step >= DELETE_STEPS.length) setDeleteState('done');
+    if (deleteState === "deleting" && step >= DELETE_STEPS.length) setDeleteState("done");
   }, [deleteState, step]);
 
   React.useEffect(() => {
-    if (deleteState !== 'done') return undefined;
-    const t = setTimeout(() => navigate('auth'), 2400);
+    if (deleteState !== "done") return undefined;
+    const t = setTimeout(() => navigate("auth"), 2400);
     return () => clearTimeout(t);
   }, [deleteState]);
 
@@ -88,22 +96,22 @@ export default function Screen() {
 
   const closeModal = () => {
     setModalOpen(false);
-    setConfirmText('');
-    setConfirmError('');
-    setDeleteState('confirm');
+    setConfirmText("");
+    setConfirmError("");
+    setDeleteState("confirm");
     setStep(0);
     if (triggerRef.current) triggerRef.current.focus();
   };
 
   const handleDialogKeyDown = (e) => {
-    if (e.key === 'Escape') {
+    if (e.key === "Escape") {
       e.stopPropagation();
-      if (deleteState === 'confirm') closeModal();
+      if (deleteState === "confirm") closeModal();
       return;
     }
-    if (e.key !== 'Tab' || !dialogRef.current) return;
+    if (e.key !== "Tab" || !dialogRef.current) return;
     const nodes = Array.from(
-      dialogRef.current.querySelectorAll('button:not([disabled]), input:not([disabled]), [href]')
+      dialogRef.current.querySelectorAll("button:not([disabled]), input:not([disabled]), [href]"),
     );
     if (nodes.length === 0) return;
     const first = nodes[0];
@@ -117,26 +125,26 @@ export default function Screen() {
     }
   };
 
-  const matches = confirmText.trim() === 'DELETE';
+  const matches = confirmText.trim() === "DELETE";
 
   const handleConfirmSubmit = (e) => {
     e.preventDefault();
-    if (deleteState !== 'confirm') return;
+    if (deleteState !== "confirm") return;
     if (!matches) {
       setConfirmError(
         confirmText.trim().length === 0
-          ? 'Type DELETE in capital letters to confirm.'
-          : 'That doesn’t match. Type DELETE in capital letters — you typed “' + confirmText + '”.'
+          ? "Type DELETE in capital letters to confirm."
+          : "That doesn’t match. Type DELETE in capital letters — you typed “" + confirmText + "”.",
       );
       if (inputRef.current) inputRef.current.focus();
       return;
     }
-    setConfirmError('');
+    setConfirmError("");
     setStep(0);
-    setDeleteState('deleting');
+    setDeleteState("deleting");
   };
 
-  const label = 'text-[12px] font-semibold uppercase tracking-[0.16em]';
+  const label = "text-[12px] font-semibold uppercase tracking-[0.16em]";
 
   return (
     <div
@@ -144,10 +152,10 @@ export default function Screen() {
       style={{
         fontFamily: brand.fontBody,
         color: TOKENS.textPrimary,
-        ['--pulse-primary']: brand.primaryColor,
-        ['--pulse-accent']: brand.accentColor,
-        ['--pulse-danger']: TOKENS.danger,
-        ['--pulse-radius']: brand.radius,
+        ["--pulse-primary"]: brand.primaryColor,
+        ["--pulse-accent"]: brand.accentColor,
+        ["--pulse-danger"]: TOKENS.danger,
+        ["--pulse-radius"]: brand.radius,
       }}
     >
       <style>{`
@@ -200,9 +208,9 @@ export default function Screen() {
         className="relative overflow-hidden p-6 sm:p-8"
         style={{
           background: TOKENS.glass,
-          border: '1px solid ' + TOKENS.hairline,
+          border: "1px solid " + TOKENS.hairline,
           borderRadius: brand.radius,
-          backdropFilter: 'blur(18px)',
+          backdropFilter: "blur(18px)",
         }}
       >
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
@@ -212,7 +220,7 @@ export default function Screen() {
               className="absolute -inset-1 rounded-full blur-[14px]"
               style={{
                 backgroundImage:
-                  'linear-gradient(135deg, ' + brand.primaryColor + ', ' + brand.accentColor + ')',
+                  "linear-gradient(135deg, " + brand.primaryColor + ", " + brand.accentColor + ")",
                 opacity: 0.55,
               }}
             />
@@ -223,7 +231,10 @@ export default function Screen() {
             <span
               aria-hidden="true"
               className="pulse-dot absolute -bottom-0.5 -right-0.5 block h-4 w-4 rounded-full"
-              style={{ background: brand.primaryColor, border: '2px solid ' + brand.backgroundColor }}
+              style={{
+                background: brand.primaryColor,
+                border: "2px solid " + brand.backgroundColor,
+              }}
             />
           </div>
 
@@ -238,9 +249,9 @@ export default function Screen() {
               <Badge
                 className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
                 style={{
-                  background: 'rgba(34,211,238,0.14)',
+                  background: "rgba(34,211,238,0.14)",
                   color: brand.primaryColor,
-                  border: '1px solid rgba(34,211,238,0.34)',
+                  border: "1px solid rgba(34,211,238,0.34)",
                 }}
               >
                 Session active
@@ -251,17 +262,17 @@ export default function Screen() {
               className="mt-3 max-w-[62ch] text-[15px] leading-[1.6]"
               style={{ color: brand.neutralColor }}
             >
-              Signed in as{' '}
+              Signed in as{" "}
               <span style={{ color: TOKENS.textPrimary, fontWeight: 600 }}>{ACCOUNT.email}</span>.
               Account created {ACCOUNT.created_at}. Only you can see your documents and chats.
             </p>
 
             <dl className="mt-6 grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2">
               {[
-                { k: 'Email', v: ACCOUNT.email },
-                { k: 'Account created', v: ACCOUNT.created_at },
-                { k: 'This session', v: ACCOUNT.session_started },
-                { k: 'Data visibility', v: 'Private to you only' },
+                { k: "Email", v: ACCOUNT.email },
+                { k: "Account created", v: ACCOUNT.created_at },
+                { k: "This session", v: ACCOUNT.session_started },
+                { k: "Data visibility", v: "Private to you only" },
               ].map((row) => (
                 <div key={row.k}>
                   <dt className={label} style={{ color: brand.neutralColor, opacity: 0.85 }}>
@@ -269,7 +280,7 @@ export default function Screen() {
                   </dt>
                   <dd
                     className="mt-1.5 text-[15px] font-medium"
-                    style={{ fontVariantNumeric: 'tabular-nums' }}
+                    style={{ fontVariantNumeric: "tabular-nums" }}
                   >
                     {row.v}
                   </dd>
@@ -286,25 +297,25 @@ export default function Screen() {
           <Button
             data-wf="b-2-0"
             type="button"
-            onClick={() => setSignOutState('pending')}
-            aria-busy={signOutState === 'pending'}
-            disabled={signOutState === 'pending'}
+            onClick={handleSignOut}
+            aria-busy={signOutState === "pending"}
+            disabled={signOutState === "pending"}
             className="w-full justify-center border-0 transition-transform duration-200 hover:-translate-y-[1px]"
             style={{
-              minHeight: '52px',
-              padding: '0 24px',
+              minHeight: "52px",
+              padding: "0 24px",
               borderRadius: brand.radius,
               backgroundImage:
-                'linear-gradient(110deg, ' + brand.primaryColor + ', ' + brand.accentColor + ')',
+                "linear-gradient(110deg, " + brand.primaryColor + ", " + brand.accentColor + ")",
               color: brand.backgroundColor,
-              fontSize: '16px',
+              fontSize: "16px",
               fontWeight: 700,
-              letterSpacing: '-0.01em',
-              boxShadow: '0 18px 48px -18px ' + brand.accentColor,
-              opacity: signOutState === 'pending' ? 0.75 : 1,
+              letterSpacing: "-0.01em",
+              boxShadow: "0 18px 48px -18px " + brand.accentColor,
+              opacity: signOutState === "pending" ? 0.75 : 1,
             }}
           >
-            {signOutState === 'pending' ? (
+            {signOutState === "pending" ? (
               <span className="inline-flex items-center gap-2">
                 <Clock className="h-4 w-4" aria-hidden="true" />
                 Signing you out…
@@ -322,9 +333,9 @@ export default function Screen() {
           style={{ color: brand.neutralColor }}
           role="status"
         >
-          {signOutState === 'pending'
-            ? 'Ending your session and returning you to the sign-in page. Nothing has been deleted.'
-            : 'Ends this session and sends you back to the sign-in page. Your documents, embeddings and chat history stay exactly as they are.'}
+          {signOutState === "pending"
+            ? "Ending your session and returning you to the sign-in page. Nothing has been deleted."
+            : "Ends this session and sends you back to the sign-in page. Your documents, embeddings and chat history stay exactly as they are."}
         </p>
       </div>
 
@@ -333,7 +344,7 @@ export default function Screen() {
         className="relative mt-10 overflow-hidden"
         style={{
           background: TOKENS.dangerWash,
-          border: '1px solid ' + TOKENS.dangerLine,
+          border: "1px solid " + TOKENS.dangerLine,
           borderRadius: brand.radius,
         }}
       >
@@ -342,7 +353,7 @@ export default function Screen() {
           className="absolute inset-x-0 top-0 h-px"
           style={{
             backgroundImage:
-              'linear-gradient(90deg, transparent, ' + TOKENS.danger + ', transparent)',
+              "linear-gradient(90deg, transparent, " + TOKENS.danger + ", transparent)",
           }}
         />
         <div className="p-6 sm:p-8">
@@ -364,13 +375,24 @@ export default function Screen() {
               embeddings, and every chat session and message. This cannot be undone.
             </p>
 
-            <ul className="mt-6 grid grid-cols-2 gap-px lg:grid-cols-4"
-                style={{ background: TOKENS.hairlineSoft, borderRadius: brand.radius, overflow: 'hidden', border: '1px solid ' + TOKENS.hairlineSoft }}>
+            <ul
+              className="mt-6 grid grid-cols-2 gap-px lg:grid-cols-4"
+              style={{
+                background: TOKENS.hairlineSoft,
+                borderRadius: brand.radius,
+                overflow: "hidden",
+                border: "1px solid " + TOKENS.hairlineSoft,
+              }}
+            >
               {FOOTPRINT.map((item) => (
-                <li key={item.label} className="px-5 py-5" style={{ background: 'rgba(6,20,43,0.55)' }}>
+                <li
+                  key={item.label}
+                  className="px-5 py-5"
+                  style={{ background: "rgba(6,20,43,0.55)" }}
+                >
                   <p
                     className="text-[30px] font-bold leading-none tracking-[-0.03em]"
-                    style={{ fontVariantNumeric: 'tabular-nums', fontFamily: brand.fontHeading }}
+                    style={{ fontVariantNumeric: "tabular-nums", fontFamily: brand.fontHeading }}
                   >
                     {item.value}
                   </p>
@@ -402,13 +424,13 @@ export default function Screen() {
                 className="w-full justify-center transition-colors duration-200"
                 data-soft
                 style={{
-                  minHeight: '52px',
-                  padding: '0 24px',
+                  minHeight: "52px",
+                  padding: "0 24px",
                   borderRadius: brand.radius,
-                  background: 'transparent',
-                  border: '1px solid ' + TOKENS.danger,
+                  background: "transparent",
+                  border: "1px solid " + TOKENS.danger,
                   color: TOKENS.danger,
-                  fontSize: '15px',
+                  fontSize: "15px",
                   fontWeight: 700,
                 }}
               >
@@ -433,7 +455,7 @@ export default function Screen() {
         {modalOpen && (
           <div
             className="pulse-fade fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
-            style={{ background: 'rgba(3,10,24,0.74)', backdropFilter: 'blur(10px)' }}
+            style={{ background: "rgba(3,10,24,0.74)", backdropFilter: "blur(10px)" }}
           >
             <div
               ref={dialogRef}
@@ -444,14 +466,13 @@ export default function Screen() {
               onKeyDown={handleDialogKeyDown}
               className="pulse-rise relative w-full max-w-lg overflow-hidden p-6 sm:p-8"
               style={{
-                background: 'rgba(10,24,48,0.92)',
-                border: '1px solid ' + TOKENS.dangerLine,
+                background: "rgba(10,24,48,0.92)",
+                border: "1px solid " + TOKENS.dangerLine,
                 borderRadius: brand.radius,
-                boxShadow:
-                  '0 50px 110px -30px rgba(0,0,0,0.85), 0 0 60px -20px ' + TOKENS.danger,
+                boxShadow: "0 50px 110px -30px rgba(0,0,0,0.85), 0 0 60px -20px " + TOKENS.danger,
               }}
             >
-              {deleteState !== 'done' && (
+              {deleteState !== "done" && (
                 <>
                   <h2
                     id="delete-dialog-title"
@@ -471,7 +492,7 @@ export default function Screen() {
                 </>
               )}
 
-              {deleteState === 'confirm' && (
+              {deleteState === "confirm" && (
                 <form onSubmit={handleConfirmSubmit} className="mt-6">
                   <Label
                     htmlFor="confirm-delete"
@@ -489,21 +510,21 @@ export default function Screen() {
                     spellCheck="false"
                     onChange={(e) => {
                       setConfirmText(e.target.value);
-                      if (confirmError) setConfirmError('');
+                      if (confirmError) setConfirmError("");
                     }}
-                    aria-invalid={confirmError ? 'true' : 'false'}
-                    aria-describedby={confirmError ? 'confirm-delete-error' : 'confirm-delete-hint'}
+                    aria-invalid={confirmError ? "true" : "false"}
+                    aria-describedby={confirmError ? "confirm-delete-error" : "confirm-delete-hint"}
                     className="mt-2 w-full"
                     style={{
-                      minHeight: '48px',
-                      padding: '0 16px',
+                      minHeight: "48px",
+                      padding: "0 16px",
                       borderRadius: brand.radius,
-                      background: 'rgba(255,255,255,0.05)',
-                      border: '1px solid ' + (confirmError ? TOKENS.danger : TOKENS.hairline),
+                      background: "rgba(255,255,255,0.05)",
+                      border: "1px solid " + (confirmError ? TOKENS.danger : TOKENS.hairline),
                       color: TOKENS.textPrimary,
-                      fontSize: '16px',
-                      letterSpacing: '0.08em',
-                      fontVariantNumeric: 'tabular-nums',
+                      fontSize: "16px",
+                      letterSpacing: "0.08em",
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   />
                   {confirmError ? (
@@ -528,11 +549,11 @@ export default function Screen() {
                 </form>
               )}
 
-              {deleteState === 'deleting' && (
+              {deleteState === "deleting" && (
                 <div className="mt-6">
                   <div
                     className="relative h-1 w-full overflow-hidden"
-                    style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '999px' }}
+                    style={{ background: "rgba(255,255,255,0.08)", borderRadius: "999px" }}
                     role="progressbar"
                     aria-label="Deleting your account"
                     aria-valuemin={0}
@@ -558,13 +579,17 @@ export default function Screen() {
                           }}
                         >
                           {done ? (
-                            <Check className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" style={{ color: brand.primaryColor }} />
+                            <Check
+                              className="mt-0.5 h-4 w-4 shrink-0"
+                              aria-hidden="true"
+                              style={{ color: brand.primaryColor }}
+                            />
                           ) : (
                             <Clock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                           )}
                           <span>
                             {s}
-                            <span className="sr-only">{done ? ' — done' : ' — in progress'}</span>
+                            <span className="sr-only">{done ? " — done" : " — in progress"}</span>
                           </span>
                         </li>
                       );
@@ -573,7 +598,7 @@ export default function Screen() {
                 </div>
               )}
 
-              {deleteState === 'done' && (
+              {deleteState === "done" && (
                 <div className="pulse-fade">
                   <CheckCircle
                     className="h-10 w-10"
@@ -604,19 +629,19 @@ export default function Screen() {
                   data-wf="i-5-0-2"
                   type="button"
                   onClick={closeModal}
-                  disabled={deleteState !== 'confirm'}
+                  disabled={deleteState !== "confirm"}
                   data-soft
                   className="justify-center transition-colors duration-200"
                   style={{
-                    minHeight: '48px',
-                    padding: '0 22px',
+                    minHeight: "48px",
+                    padding: "0 22px",
                     borderRadius: brand.radius,
                     background: TOKENS.glass,
-                    border: '1px solid ' + TOKENS.hairline,
+                    border: "1px solid " + TOKENS.hairline,
                     color: TOKENS.textPrimary,
-                    fontSize: '15px',
+                    fontSize: "15px",
                     fontWeight: 600,
-                    opacity: deleteState === 'confirm' ? 1 : 0.4,
+                    opacity: deleteState === "confirm" ? 1 : 0.4,
                   }}
                 >
                   Cancel
@@ -626,44 +651,45 @@ export default function Screen() {
                   data-wf="i-5-0-1"
                   type="button"
                   onClick={(e) => {
-                    if (deleteState === 'done') {
-                      navigate('auth');
+                    if (deleteState === "done") {
+                      navigate("auth");
                       return;
                     }
-                    if (deleteState === 'deleting') return;
+                    if (deleteState === "deleting") return;
                     handleConfirmSubmit(e);
                   }}
-                  aria-disabled={deleteState === 'confirm' && !matches ? 'true' : 'false'}
-                  aria-busy={deleteState === 'deleting'}
+                  aria-disabled={deleteState === "confirm" && !matches ? "true" : "false"}
+                  aria-busy={deleteState === "deleting"}
                   className="justify-center transition-all duration-200"
                   style={{
-                    minHeight: '48px',
-                    padding: '0 22px',
+                    minHeight: "48px",
+                    padding: "0 22px",
                     borderRadius: brand.radius,
                     background:
-                      deleteState === 'done'
+                      deleteState === "done"
                         ? brand.primaryColor
-                        : matches || deleteState === 'deleting'
-                        ? TOKENS.danger
-                        : 'rgba(255,77,109,0.14)',
+                        : matches || deleteState === "deleting"
+                          ? TOKENS.danger
+                          : "rgba(255,77,109,0.14)",
                     border:
-                      matches || deleteState !== 'confirm'
-                        ? '1px solid transparent'
-                        : '1px solid ' + TOKENS.dangerLine,
+                      matches || deleteState !== "confirm"
+                        ? "1px solid transparent"
+                        : "1px solid " + TOKENS.dangerLine,
                     color:
-                      matches || deleteState !== 'confirm' ? brand.backgroundColor : TOKENS.danger,
-                    fontSize: '15px',
+                      matches || deleteState !== "confirm" ? brand.backgroundColor : TOKENS.danger,
+                    fontSize: "15px",
                     fontWeight: 700,
-                    boxShadow: matches && deleteState === 'confirm'
-                      ? '0 16px 44px -18px ' + TOKENS.danger
-                      : 'none',
+                    boxShadow:
+                      matches && deleteState === "confirm"
+                        ? "0 16px 44px -18px " + TOKENS.danger
+                        : "none",
                   }}
                 >
-                  {deleteState === 'done'
-                    ? 'Go to sign in'
-                    : deleteState === 'deleting'
-                    ? 'Deleting your account…'
-                    : 'Delete account permanently'}
+                  {deleteState === "done"
+                    ? "Go to sign in"
+                    : deleteState === "deleting"
+                      ? "Deleting your account…"
+                      : "Delete account permanently"}
                 </Button>
               </div>
             </div>

@@ -6,22 +6,16 @@ import * as UI from "@/lib/ui";
 import { Icons } from "@/lib/icons";
 import { brand } from "@/lib/brand";
 import { useNavigate } from "@/lib/navigate";
+import { apiFetch, ApiError } from "@/lib/api";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 const { Switch } = UI;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 const { Home, ArrowLeft, ArrowRight, AlertCircle, CheckCircle } = Icons;
 
 const PRODUCT = "RAG Chatbot";
 const PAGE_TITLE = "Sign in to RAG Chatbot";
 const MIN_PASSWORD = 10;
-
-// Seeded accounts for the prototype (users: id, email, password_hash, created_at)
-const REGISTERED = [
-  { id: "usr_8f21", email: "maya.okonkwo@fieldnotes.io", password: "ferrybridge-2026", created_at: "2026-03-14" },
-  { id: "usr_41b7", email: "d.arslan@northlight.co", password: "chunk-overlap-128", created_at: "2026-08-02" },
-];
-const DEMO = REGISTERED[0];
 
 const TABS = [
   { key: "signin", label: "Sign in", wf: "i-1-0-0" },
@@ -31,11 +25,37 @@ const TABS = [
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const mix = (colour, percent) => `color-mix(in srgb, ${colour} ${percent}%, transparent)`;
 
+// Turns a 422 response body into { email, password } messages. FastAPI's own request
+// validation returns `detail: [{ loc, msg }]`; a handler that raises its own
+// HTTPException instead may send `detail` as a plain string or as `{ email, password }`.
+// All three are read here so whichever shape the API answers with still reaches the field.
+function fieldErrorsFrom(body) {
+  const result = { email: null, password: null };
+  const detail = body && body.detail;
+  if (Array.isArray(detail)) {
+    detail.forEach((item) => {
+      const field = Array.isArray(item.loc) ? item.loc[item.loc.length - 1] : item.field;
+      const msg = item.msg || item.message;
+      if (field === "email" && msg) result.email = msg;
+      else if (field === "password" && msg) result.password = msg;
+    });
+  } else if (detail && typeof detail === "object") {
+    if (detail.email) result.email = detail.email;
+    if (detail.password) result.password = detail.password;
+  } else if (typeof detail === "string") {
+    result.password = detail;
+  }
+  if (!result.email && !result.password) {
+    result.password = "That didn't work — check your details and try again.";
+  }
+  return result;
+}
+
 export default function Screen() {
   const navigate = useNavigate();
   const [mode, setMode] = React.useState("signin");
-  const [email, setEmail] = React.useState(DEMO.email);
-  const [password, setPassword] = React.useState(DEMO.password);
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
   const [phase, setPhase] = React.useState("idle"); // idle | submitting | success
   const [credentialError, setCredentialError] = React.useState(false);
   const [errors, setErrors] = React.useState({ email: null, password: null });
@@ -76,7 +96,7 @@ export default function Screen() {
     if (node) node.focus();
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     if (busy || done) return;
 
@@ -84,13 +104,10 @@ export default function Screen() {
     const next = { email: null, password: null };
 
     if (!trimmed) next.email = "Enter the email address for your account.";
-    else if (!EMAIL_RE.test(trimmed)) next.email = "That is not a complete email address — check the @ and the domain.";
-    else if (mode === "signup" && REGISTERED.some((a) => a.email.toLowerCase() === trimmed.toLowerCase())) {
-      next.email = `${trimmed} is already registered. Switch to Sign in to reach your documents.`;
-    }
+    else if (!EMAIL_RE.test(trimmed))
+      next.email = "That is not a complete email address — check the @ and the domain.";
 
     if (!password) next.password = `Choose a password of at least ${MIN_PASSWORD} characters.`;
-    else if (password.length < MIN_PASSWORD) next.password = `${MIN_PASSWORD - password.length} more characters needed — ${MIN_PASSWORD} is the minimum.`;
 
     if (next.email || next.password) {
       setErrors(next);
@@ -104,22 +121,40 @@ export default function Screen() {
     setCredentialError(false);
     setPhase("submitting");
 
-    timers.current.push(
-      setTimeout(() => {
-        if (mode === "signin") {
-          const account = REGISTERED.find(
-            (a) => a.email.toLowerCase() === trimmed.toLowerCase() && a.password === password
-          );
-          if (!account) {
-            setPhase("idle");
-            setCredentialError(true);
-            return;
-          }
+    const endpoint = mode === "signin" ? "/auth/signin" : "/auth/signup";
+
+    try {
+      await apiFetch(endpoint, {
+        method: "POST",
+        body: JSON.stringify({ email: trimmed, password }),
+      });
+      setPhase("success");
+      timers.current.push(setTimeout(() => navigate("dashboard"), 700));
+    } catch (err) {
+      setPhase("idle");
+      if (err instanceof ApiError) {
+        if (err.status === 401) {
+          setCredentialError(true);
+          return;
         }
-        setPhase("success");
-        timers.current.push(setTimeout(() => navigate("dashboard"), 700));
-      }, 900)
-    );
+        if (err.status === 409) {
+          setErrors({
+            email: `${trimmed} is already registered. Switch to Sign in to reach your documents.`,
+            password: null,
+          });
+          if (emailRef.current) emailRef.current.focus();
+          return;
+        }
+        if (err.status === 422) {
+          const fieldErrors = fieldErrorsFrom(err.body);
+          setErrors(fieldErrors);
+          const node = fieldErrors.email ? emailRef.current : passwordRef.current;
+          if (node) node.focus();
+          return;
+        }
+      }
+      setErrors({ email: null, password: "Something went wrong — try again." });
+    }
   };
 
   const primaryLabel = mode === "signin" ? "Sign in" : "Create account";
@@ -143,9 +178,22 @@ export default function Screen() {
         }
       `}</style>
 
-      <div aria-hidden className="pointer-events-none absolute -left-32 top-[-120px] h-[520px] w-[520px] rounded-full blur-[120px]" style={{ backgroundColor: mix(brand.primaryColor, 70) }} />
-      <div aria-hidden className="pointer-events-none absolute bottom-[-160px] right-[-80px] h-[560px] w-[560px] rounded-full blur-[130px]" style={{ backgroundColor: mix(brand.accentColor, 60) }} />
-      <p className="absolute left-6 top-7 text-lg font-bold sm:left-10 sm:top-8" style={{ fontFamily: brand.fontHeading }}>{PRODUCT}</p>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -left-32 top-[-120px] h-[520px] w-[520px] rounded-full blur-[120px]"
+        style={{ backgroundColor: mix(brand.primaryColor, 70) }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute bottom-[-160px] right-[-80px] h-[560px] w-[560px] rounded-full blur-[130px]"
+        style={{ backgroundColor: mix(brand.accentColor, 60) }}
+      />
+      <p
+        className="absolute left-6 top-7 text-lg font-bold sm:left-10 sm:top-8"
+        style={{ fontFamily: brand.fontHeading }}
+      >
+        {PRODUCT}
+      </p>
 
       <main
         className="relative w-full max-w-[440px] p-6 backdrop-blur-2xl sm:p-10"
@@ -153,15 +201,26 @@ export default function Screen() {
       >
         {/* b-0-0 page_title */}
         <header data-wf="b-0-0">
-          <p className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold" style={{ backgroundColor: mix(brand.accentColor, 25), color: "#fff" }}>
-            <span aria-hidden className="np-pulse inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: brand.primaryColor }} />
+          <p
+            className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
+            style={{ backgroundColor: mix(brand.accentColor, 25), color: "#fff" }}
+          >
+            <span
+              aria-hidden
+              className="np-pulse inline-block h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: brand.primaryColor }}
+            />
             Gemini 2.5 Flash · answers grounded in your files
           </p>
-          <h1 className="mt-5 text-[34px] font-extrabold leading-[1.1] tracking-tight sm:text-4xl" style={{ fontFamily: brand.fontHeading }}>
+          <h1
+            className="mt-5 text-[34px] font-extrabold leading-[1.1] tracking-tight sm:text-4xl"
+            style={{ fontFamily: brand.fontHeading }}
+          >
             {PAGE_TITLE}
           </h1>
           <p className="mt-3 max-w-[46ch] text-sm leading-relaxed text-white/65">
-            Your documents, their embeddings and every chat session stay locked to your account — no one else can open or cite them.
+            Your documents, their embeddings and every chat session stay locked to your account — no
+            one else can open or cite them.
           </p>
         </header>
 
@@ -179,7 +238,9 @@ export default function Screen() {
               <button
                 key={tab.key}
                 data-wf={tab.wf}
-                ref={(node) => { tabRefs.current[index] = node; }}
+                ref={(node) => {
+                  tabRefs.current[index] = node;
+                }}
                 type="button"
                 role="tab"
                 id={`auth-tab-${tab.key}`}
@@ -191,7 +252,9 @@ export default function Screen() {
                 className={`np-focus h-11 px-3 text-sm transition-colors ${active ? "font-bold text-white" : "font-semibold text-white/60 hover:bg-white/10 hover:text-white/90"}`}
                 style={{
                   borderRadius: `calc(${brand.radius} - 4px)`,
-                  background: active ? `linear-gradient(90deg, ${brand.primaryColor}, ${brand.accentColor})` : "transparent",
+                  background: active
+                    ? `linear-gradient(90deg, ${brand.primaryColor}, ${brand.accentColor})`
+                    : "transparent",
                   color: active ? "#06142b" : undefined,
                   boxShadow: active ? `0 10px 30px -12px ${mix(brand.accentColor, 90)}` : "none",
                 }}
@@ -202,15 +265,31 @@ export default function Screen() {
           })}
         </div>
 
-        <div id="auth-panel" role="tabpanel" aria-labelledby={`auth-tab-${mode}`} tabIndex={-1} className="outline-none">
+        <div
+          id="auth-panel"
+          role="tabpanel"
+          aria-labelledby={`auth-tab-${mode}`}
+          tabIndex={-1}
+          className="outline-none"
+        >
           {done ? (
-            <div key="done" className="np-rise mt-7 p-5" style={{ ...glass, boxShadow: glow }} role="status">
+            <div
+              key="done"
+              className="np-rise mt-7 p-5"
+              style={{ ...glass, boxShadow: glow }}
+              role="status"
+            >
               <p className="flex items-center gap-2 text-sm font-bold">
-                <CheckCircle aria-hidden className="h-4 w-4" style={{ color: brand.primaryColor }} />
+                <CheckCircle
+                  aria-hidden
+                  className="h-4 w-4"
+                  style={{ color: brand.primaryColor }}
+                />
                 {mode === "signin" ? "Signed in" : "Account created"}
               </p>
               <p className="mt-2 text-sm leading-relaxed text-white/70">
-                Opening the dashboard for {email.trim()} — your documents and chat sessions load next.
+                Opening the dashboard for {email.trim()} — your documents and chat sessions load
+                next.
               </p>
             </div>
           ) : (
@@ -218,7 +297,10 @@ export default function Screen() {
               {/* b-2-0 form */}
               <form data-wf="b-2-0" noValidate className="mt-7 space-y-5" onSubmit={handleSubmit}>
                 <div>
-                  <label htmlFor="auth-email" className="block text-xs font-semibold uppercase tracking-[0.12em] text-white/70">
+                  <label
+                    htmlFor="auth-email"
+                    className="block text-xs font-semibold uppercase tracking-[0.12em] text-white/70"
+                  >
                     Email
                   </label>
                   <input
@@ -231,15 +313,25 @@ export default function Screen() {
                     inputMode="email"
                     value={email}
                     disabled={busy}
-                    onChange={(e) => { setEmail(e.target.value); if (errors.email) setErrors((p) => ({ ...p, email: null })); }}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (errors.email) setErrors((p) => ({ ...p, email: null }));
+                    }}
                     aria-invalid={errors.email ? true : undefined}
                     aria-describedby={errors.email ? "auth-email-error" : undefined}
                     className="np-focus mt-2 h-12 w-full px-4 text-sm text-white outline-none transition-colors placeholder:text-white/35 disabled:opacity-60"
-                    style={{ ...glass, borderColor: errors.email ? brand.accentColor : "rgba(255,255,255,0.14)" }}
+                    style={{
+                      ...glass,
+                      borderColor: errors.email ? brand.accentColor : "rgba(255,255,255,0.14)",
+                    }}
                     placeholder="you@company.com"
                   />
                   {errors.email && (
-                    <p id="auth-email-error" className="np-rise mt-2 flex items-start gap-2 text-xs font-semibold leading-relaxed" style={{ color: brand.accentColor }}>
+                    <p
+                      id="auth-email-error"
+                      className="np-rise mt-2 flex items-start gap-2 text-xs font-semibold leading-relaxed"
+                      style={{ color: brand.accentColor }}
+                    >
                       <AlertCircle aria-hidden className="mt-px h-3.5 w-3.5 shrink-0" />
                       <span>{errors.email}</span>
                     </p>
@@ -247,7 +339,10 @@ export default function Screen() {
                 </div>
 
                 <div>
-                  <label htmlFor="auth-password" className="block text-xs font-semibold uppercase tracking-[0.12em] text-white/70">
+                  <label
+                    htmlFor="auth-password"
+                    className="block text-xs font-semibold uppercase tracking-[0.12em] text-white/70"
+                  >
                     Password (at least {MIN_PASSWORD} characters)
                   </label>
                   <input
@@ -259,21 +354,37 @@ export default function Screen() {
                     autoComplete={mode === "signin" ? "current-password" : "new-password"}
                     value={password}
                     disabled={busy}
-                    onChange={(e) => { setPassword(e.target.value); if (errors.password) setErrors((p) => ({ ...p, password: null })); }}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (errors.password) setErrors((p) => ({ ...p, password: null }));
+                    }}
                     aria-invalid={errors.password ? true : undefined}
-                    aria-describedby={errors.password ? "auth-password-error" : "auth-password-hint"}
+                    aria-describedby={
+                      errors.password ? "auth-password-error" : "auth-password-hint"
+                    }
                     className="np-focus mt-2 h-12 w-full px-4 text-sm text-white outline-none transition-colors placeholder:text-white/35 disabled:opacity-60"
-                    style={{ ...glass, borderColor: errors.password ? brand.accentColor : "rgba(255,255,255,0.14)" }}
+                    style={{
+                      ...glass,
+                      borderColor: errors.password ? brand.accentColor : "rgba(255,255,255,0.14)",
+                    }}
                     placeholder="••••••••••"
                   />
                   {errors.password ? (
-                    <p id="auth-password-error" className="np-rise mt-2 flex items-start gap-2 text-xs font-semibold leading-relaxed" style={{ color: brand.accentColor }}>
+                    <p
+                      id="auth-password-error"
+                      className="np-rise mt-2 flex items-start gap-2 text-xs font-semibold leading-relaxed"
+                      style={{ color: brand.accentColor }}
+                    >
                       <AlertCircle aria-hidden className="mt-px h-3.5 w-3.5 shrink-0" />
                       <span>{errors.password}</span>
                     </p>
                   ) : (
-                    <p id="auth-password-hint" className="mt-2 text-xs leading-relaxed text-white/50" style={{ fontVariantNumeric: "tabular-nums" }}>
-                      {password.length} of {MIN_PASSWORD} characters · demo account {DEMO.email} / {DEMO.password}
+                    <p
+                      id="auth-password-hint"
+                      className="mt-2 text-xs leading-relaxed text-white/50"
+                      style={{ fontVariantNumeric: "tabular-nums" }}
+                    >
+                      {password.length} of {MIN_PASSWORD} characters
                     </p>
                   )}
                 </div>
@@ -294,8 +405,13 @@ export default function Screen() {
                 >
                   {busy ? (
                     <React.Fragment>
-                      <span aria-hidden className="np-spin inline-block h-4 w-4 rounded-full border-2 border-[#06142b]/30 border-t-[#06142b]" />
-                      {mode === "signin" ? "Checking your credentials…" : "Setting up your workspace…"}
+                      <span
+                        aria-hidden
+                        className="np-spin inline-block h-4 w-4 rounded-full border-2 border-[#06142b]/30 border-t-[#06142b]"
+                      />
+                      {mode === "signin"
+                        ? "Checking your credentials…"
+                        : "Setting up your workspace…"}
                     </React.Fragment>
                   ) : (
                     <React.Fragment>
@@ -310,16 +426,32 @@ export default function Screen() {
               <div
                 data-wf="b-4-0"
                 className={credentialError ? "np-rise mt-5 p-4" : "mt-5 px-1"}
-                style={credentialError ? { ...glass, borderColor: mix(brand.accentColor, 55), backgroundColor: mix(brand.accentColor, 12) } : undefined}
+                style={
+                  credentialError
+                    ? {
+                        ...glass,
+                        borderColor: mix(brand.accentColor, 55),
+                        backgroundColor: mix(brand.accentColor, 12),
+                      }
+                    : undefined
+                }
               >
                 <p
                   role={credentialError ? "alert" : undefined}
                   className="flex items-start gap-2 text-sm leading-relaxed text-white/70"
                 >
-                  {credentialError && <AlertCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" style={{ color: brand.accentColor }} />}
+                  {credentialError && (
+                    <AlertCircle
+                      aria-hidden
+                      className="mt-0.5 h-4 w-4 shrink-0"
+                      style={{ color: brand.accentColor }}
+                    />
+                  )}
                   <span>
                     {credentialError && (
-                      <strong className="font-bold text-white">Email or password is incorrect. </strong>
+                      <strong className="font-bold text-white">
+                        Email or password is incorrect.{" "}
+                      </strong>
                     )}
                     {mode === "signin" ? (
                       <React.Fragment>
@@ -336,7 +468,8 @@ export default function Screen() {
                       </React.Fragment>
                     ) : (
                       <React.Fragment>
-                        Your account works straight away, no email verification needed. Already registered?{" "}
+                        Your account works straight away, no email verification needed. Already
+                        registered?{" "}
                         <button
                           type="button"
                           onClick={() => switchMode("signin")}

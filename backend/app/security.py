@@ -17,14 +17,28 @@ a fresh clone; the platform always overrides them in a real deployment.
 
 import hmac
 import os
+import uuid
 
-from fastapi import Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from passlib.context import CryptContext
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models import User
 
 SECRET_KEY: str = os.getenv("SECRET_KEY", "")
 JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "dev-insecure-jwt-secret-change-me")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# A real bcrypt hash of a password nobody can sign in with, used to make
+# signin take the same amount of time whether or not the email is
+# registered (NFR-003: never reveal whether an email is registered).
+_DUMMY_PASSWORD_HASH = pwd_context.hash("not-a-real-account-password")
+
+
+def _unauthorized() -> HTTPException:
+    return HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="not authenticated")
 
 
 def hash_password(password: str) -> str:
@@ -53,3 +67,30 @@ async def require_api_secret(authorization: str | None = Header(default=None)) -
     token = authorization.removeprefix("Bearer ").strip()
     if not hmac.compare_digest(token, SECRET_KEY):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid bearer token")
+
+
+async def current_user(
+    request: Request,
+    db: Session = Depends(get_db),  # noqa: B008 -- FastAPI's own dependency-injection idiom
+) -> User:
+    """The signed-in user, from the session cookie `app.routers.auth` sets.
+
+    Fails closed: any missing, malformed or stale session -- no cookie, a
+    cookie whose ``user_id`` is not a UUID, or a UUID with no matching row
+    (e.g. a deleted account) -- is a 401, never a 500 and never a user. This
+    is the dependency every later, per-user router (documents, sessions)
+    reuses in place of `require_api_secret` alone.
+    """
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise _unauthorized()
+    try:
+        uid = uuid.UUID(str(user_id))
+    except ValueError as exc:
+        request.session.clear()
+        raise _unauthorized() from exc
+    user = db.get(User, uid)
+    if user is None:
+        request.session.clear()
+        raise _unauthorized()
+    return user

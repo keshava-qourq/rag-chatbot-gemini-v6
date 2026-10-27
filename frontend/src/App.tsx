@@ -1,6 +1,8 @@
-import { NavLink, Navigate, Outlet, Route, Routes } from "react-router-dom";
+import * as React from "react";
+import { NavLink, Navigate, Outlet, Route, Routes, useNavigate } from "react-router-dom";
 
 import { Icons } from "@/lib/icons";
+import { UNAUTHORIZED_EVENT } from "@/lib/api";
 import Auth from "@/screens/Auth";
 import Dashboard from "@/screens/Dashboard";
 import SessionsId from "@/screens/SessionsId";
@@ -14,6 +16,16 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 // The app's menu, drawn around every screen except the ones routed outside it below.
 function AppShellLayout() {
+  const navigate = useNavigate();
+
+  // Any authenticated call answering 401 (an expired or revoked session) sends the
+  // user back to sign in, from wherever they were.
+  React.useEffect(() => {
+    const onUnauthorized = () => navigate("/auth", { replace: true });
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+  }, [navigate]);
+
   return (
     <div className="flex min-h-screen flex-col">
       <header

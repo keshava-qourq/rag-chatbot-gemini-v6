@@ -1,37 +1,84 @@
 """Auth endpoints: account creation, sign-in/out and account deletion.
 
-Stub handlers only -- password verification, establishing the session and
-cascading account deletion are the development sprint's work (US-001,
-US-002, US-003). Wiring the routes now keeps the OpenAPI document (and
-anything generated from it) in sync with the approved API spec from day one.
+Account deletion (US-003) is still a stub; signup/signin/signout (US-001,
+US-002) establish and tear down the session cookie every later per-user
+router authenticates with (`app.security.current_user`).
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
-from app.schemas import StubResponse
-from app.security import require_api_secret
+from app.database import get_db
+from app.models import User
+from app.schemas import OkResponse, SigninRequest, SignupRequest, StubResponse, UserResponse
+from app.security import (
+    _DUMMY_PASSWORD_HASH,
+    hash_password,
+    require_api_secret,
+    verify_password,
+)
 
 router = APIRouter(tags=["auth"])
 
 
-@router.post("/auth/signup", response_model=StubResponse)
-async def signup() -> StubResponse:
+@router.post("/auth/signup", response_model=UserResponse)
+async def signup(
+    payload: SignupRequest,
+    request: Request,
+    db: Session = Depends(get_db),  # noqa: B008 -- FastAPI's own dependency-injection idiom
+) -> UserResponse:
     """Create account with unique email and strong password, then establish a session."""
-    return StubResponse(endpoint="POST /auth/signup")
+    existing = db.query(User).filter(User.email == payload.email).first()
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="email is already registered"
+        )
+
+    user = User(email=payload.email, password_hash=hash_password(payload.password))
+    db.add(user)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="email is already registered"
+        ) from None
+    db.refresh(user)
+
+    request.session["user_id"] = str(user.id)
+    return UserResponse(user_id=str(user.id), email=str(user.email))
 
 
-@router.post("/auth/signin", response_model=StubResponse)
-async def signin() -> StubResponse:
+@router.post("/auth/signin", response_model=UserResponse)
+async def signin(
+    payload: SigninRequest,
+    request: Request,
+    db: Session = Depends(get_db),  # noqa: B008 -- FastAPI's own dependency-injection idiom
+) -> UserResponse:
     """Authenticate email+password and establish a session; generic failure on mismatch."""
-    return StubResponse(endpoint="POST /auth/signin")
+    user = db.query(User).filter(User.email == payload.email).first()
+    # Verify against a real hash either way, so a non-existent email takes the
+    # same time as a wrong password (NFR-003: never reveal whether it is registered).
+    password_hash = user.password_hash if user is not None else _DUMMY_PASSWORD_HASH
+    password_ok = verify_password(payload.password, password_hash)
+
+    if user is None or not password_ok:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid email or password"
+        )
+
+    request.session["user_id"] = str(user.id)
+    return UserResponse(user_id=str(user.id), email=str(user.email))
 
 
 @router.post(
-    "/auth/signout", response_model=StubResponse, dependencies=[Depends(require_api_secret)]
+    "/auth/signout", response_model=OkResponse, dependencies=[Depends(require_api_secret)]
 )
-async def signout() -> StubResponse:
+async def signout(request: Request) -> OkResponse:
     """End the current session."""
-    return StubResponse(endpoint="POST /auth/signout")
+    request.session.clear()
+    return OkResponse()
 
 
 @router.delete("/account", response_model=StubResponse, dependencies=[Depends(require_api_secret)])
