@@ -5,7 +5,7 @@
 <!-- sdlc:auto:start overview -->
 Build a rag chatbot where user can upload there own documents and ask queries about them use gemini-2.5-flash for answers and gemini-embedding-001 for embeddings and have chat history and sessions
 
-**Documentation version:** v2
+**Documentation version:** v3
 <!-- sdlc:auto:end overview -->
 
 ## Contents
@@ -15,14 +15,14 @@ Build a rag chatbot where user can upload there own documents and ask queries ab
 |---|---|
 | [Requirements](requirements/README.md) | v1 approved |
 | [Architecture](architecture/README.md) | 22 entries |
-| [Development](development/README.md) | 0 entries |
+| [Development](development/README.md) | 14 entries |
 | [Testing](testing/README.md) | 0 entries |
 | [Deployment](deployment/README.md) | 0 entries |
 | [Maintenance](maintenance/README.md) | 0 entries |
 | [Data model](architecture/data-model.md) | generated |
 | [API (OpenAPI)](architecture/api/openapi.yaml) | generated |
 | [Decisions (ADRs)](architecture/adr/README.md) | 4 decisions |
-| [Sprint plan](development/sprint-plan.md) | not generated yet |
+| [Sprint plan](development/sprint-plan.md) | 5 sprints |
 | [Developer guide](development/developer-guide.md) | generated |
 | [API reference](development/api-reference.md) | 1 route |
 | [Test report](testing/test-report.md) | not run yet |
@@ -31,7 +31,7 @@ Build a rag chatbot where user can upload there own documents and ask queries ab
 | [Runbook](deployment/runbook.md) | not deployed yet |
 | [Release notes](deployment/release-notes.md) | 0 releases |
 | [Traceability matrix](traceability-matrix.md) | 20 requirements |
-| [Changelog](CHANGELOG.md) | 2 versions |
+| [Changelog](CHANGELOG.md) | 3 versions |
 <!-- sdlc:auto:end contents -->
 
 ## Open gaps
@@ -57,4 +57,24 @@ Build a rag chatbot where user can upload there own documents and ask queries ab
 - NFR-007 is referenced by the architecture input but is not among the known requirement keys provided, so it could not be linked via related_ids.
 - NFR-004 and NFR-005 are referenced by the architecture input but are not among the known requirement keys provided, so they could not be linked via related_ids.
 - Development has not been reported as complete -- only architecture input is available for this phase -- so there is no built application yet to document usage for. A full screen-by-screen user guide should be produced once development/testing confirms the UI and behavior described in the architecture (upload, document status, session management, streaming grounded chat with citations).
+
+### Development
+
+- No record of actual sprint execution, burndown, or completion status against this plan.
+- No dates given for plan approval or sprint start/end.
+- Plan input does not explicitly assign backlog item IDs to this sprint; mapping above is inferred from goal text, not stated.
+- No completion/progress status for this sprint reported.
+- Sprint-to-item mapping inferred from goal text only; plan input gives no explicit assignment.
+- No progress/completion status reported for this sprint.
+- Sprint-to-item mapping inferred from goal text only; not explicitly stated in the plan input.
+- Sprint-to-item mapping inferred from goal text only; not explicitly assigned in the plan input.
+- Possible discrepancy: US-003 is listed under EPIC-001 (Sprint 1 theme) but its goal text ('full account deletion') matches Sprint 4 instead -- flagging for confirmation of actual sprint placement.
+- No progress/completion status reported for this sprint; this is the final planned sprint and no outcome data is available.
+- No implementation status, code, or test evidence provided for any item in this epic.
+- No detail given on which vector store schema or failure-handling behavior was actually implemented for US-005-T4.
+- No detail on prompt design, citation format, or streaming behavior beyond the task titles.
+- No results of the planned cross-user isolation test suite (US-018-T2) or authorization audit (US-018-T3) have been reported.
+- No implementation status, code, or test evidence provided.
+- Specific limit thresholds (e.g. requests/day, storage caps) are not defined in this input.
+- No detail on specific dashboard layout, widgets, or responsive breakpoints.
 <!-- sdlc:auto:end open-gaps -->
