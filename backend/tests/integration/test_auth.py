@@ -27,7 +27,9 @@ def _email() -> str:
 if "/__whoami__" not in {route.path for route in app.routes}:
 
     @app.get("/__whoami__")
-    def _whoami(user: User = Depends(current_user)) -> dict[str, str]:
+    def _whoami(
+        user: User = Depends(current_user),  # noqa: B008 -- FastAPI's own DI idiom
+    ) -> dict[str, str]:
         return {"email": str(user.email)}
 
 
